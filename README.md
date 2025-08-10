@@ -269,7 +269,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 For support and questions:
 
 - Create an [Issue](https://github.com/yourusername/ecommerce-logging/issues)
-- Contact: your.email@example.com
+- Contact: email2wajidkhan@gmail.com
 - Documentation: [Wiki](https://github.com/yourusername/ecommerce-logging/wiki)
 
 ---
