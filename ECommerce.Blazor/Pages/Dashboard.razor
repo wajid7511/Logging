@@ -1,0 +1,251 @@
+@page "/"
+@using ECommerce.Blazor.Services
+@using ECommerce.Domain.Entities
+@inject ILogService LogService
+@inject ILogger<Dashboard> Logger
+
+<PageTitle>Logging Dashboard</PageTitle>
+
+<div class="container-fluid">
+    <h1 class="mb-4">Logging Dashboard</h1>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title">Total Logs</h4>
+                            <h2 class="mb-0">@totalLogs</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-journal-text" style="font-size: 3rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title">Success (2xx)</h4>
+                            <h2 class="mb-0">@successCount</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-check-circle" style="font-size: 3rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title">Client Errors (4xx)</h4>
+                            <h2 class="mb-0">@clientErrorCount</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-exclamation-triangle" style="font-size: 3rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title">Server Errors (5xx)</h4>
+                            <h2 class="mb-0">@serverErrorCount</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-x-circle" style="font-size: 3rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Recent Activity</h5>
+                </div>
+                <div class="card-body">
+                    @if (recentLogs == null)
+                    {
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    }
+                    else if (!recentLogs.Any())
+                    {
+                        <div class="alert alert-info text-center">
+                            <i class="bi bi-info-circle"></i>
+                            No recent activity found.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Method</th>
+                                        <th>Path</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var log in recentLogs.Take(10))
+                                    {
+                                        <tr class="@GetStatusRowClass(log.StatusCode)">
+                                            <td>@log.TimestampUtc.ToString("HH:mm:ss")</td>
+                                            <td>
+                                                <span class="badge @GetMethodBadgeClass(log.Method)">@log.Method</span>
+                                            </td>
+                                            <td>
+                                                <code class="text-break">@log.Path</code>
+                                            </td>
+                                            <td>
+                                                <span
+                                                    class="badge @GetStatusCodeBadgeClass(log.StatusCode)">@log.StatusCode</span>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="text-end mt-2">
+                            <a href="/logs" class="btn btn-outline-primary btn-sm">
+                                View All Logs <i class="bi bi-arrow-right"></i>
+                            </a>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">HTTP Methods Distribution</h5>
+                </div>
+                <div class="card-body">
+                    @if (methodStats != null)
+                    {
+                        @foreach (var stat in methodStats.OrderByDescending(x => x.Count))
+                        {
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge @GetMethodBadgeClass(stat.Method)">@stat.Method</span>
+                                <span class="fw-bold">@stat.Count</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private long totalLogs;
+    private long successCount;
+    private long clientErrorCount;
+    private long serverErrorCount;
+    private List<RequestResponseLog>? recentLogs;
+    private List<MethodStat>? methodStats;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardData();
+    }
+
+    private async Task LoadDashboardData()
+    {
+        try
+        {
+            // Load total counts
+            totalLogs = await LogService.GetLogsCountAsync(new LogFilter());
+
+            // Load success count (2xx)
+            successCount = await LogService.GetLogsCountAsync(new LogFilter { StatusCode = 200 });
+
+            // Load client error count (4xx)
+            var clientErrorFilter = new LogFilter { StatusCode = 400 };
+            clientErrorCount = await LogService.GetLogsCountAsync(clientErrorFilter);
+
+            // Load server error count (5xx)
+            var serverErrorFilter = new LogFilter { StatusCode = 500 };
+            serverErrorCount = await LogService.GetLogsCountAsync(serverErrorFilter);
+
+            // Load recent logs
+            recentLogs = await LogService.GetLogsAsync(new LogFilter { PageSize = 20 });
+
+            // Calculate method statistics
+            if (recentLogs != null)
+            {
+                methodStats = recentLogs
+                .GroupBy(x => x.Method)
+                .Select(g => new MethodStat { Method = g.Key, Count = g.Count() })
+                .ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load dashboard data");
+        }
+    }
+
+    private string GetStatusRowClass(int statusCode)
+    {
+        return statusCode switch
+        {
+            >= 200 and < 300 => "table-success",
+            >= 400 and < 500 => "table-warning",
+            >= 500 => "table-danger",
+            _ => ""
+        };
+    }
+
+    private string GetMethodBadgeClass(string method)
+    {
+        return method switch
+        {
+            "GET" => "bg-success",
+            "POST" => "bg-primary",
+            "PUT" => "bg-warning",
+            "DELETE" => "bg-danger",
+            "PATCH" => "bg-info",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetStatusCodeBadgeClass(int statusCode)
+    {
+        return statusCode switch
+        {
+            >= 200 and < 300 => "bg-success",
+            >= 400 and < 500 => "bg-warning",
+            >= 500 => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    private class MethodStat
+    {
+        public string Method { get; set; } = string.Empty;
+        public int Count { get; set; }
+    }
+}

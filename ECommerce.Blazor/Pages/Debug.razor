@@ -1,0 +1,90 @@
+@page "/debug"
+@using ECommerce.Blazor.Services
+@using MongoDB.Bson
+@inject ILogService LogService
+@inject ILogger<Debug> Logger
+
+<PageTitle>Debug - MongoDB Data</PageTitle>
+
+<div class="container-fluid">
+    <h1 class="mb-4">Debug - MongoDB Data Inspection</h1>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Raw MongoDB Documents</h5>
+        </div>
+        <div class="card-body">
+            @if (rawDocuments == null)
+            {
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            }
+            else if (!rawDocuments.Any())
+            {
+                <div class="alert alert-warning text-center">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    No documents found in the http_logs collection.
+                </div>
+            }
+            else
+            {
+                <div class="mb-3">
+                    <button class="btn btn-primary" @onclick="RefreshData">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh Data
+                    </button>
+                </div>
+
+                @foreach (var doc in rawDocuments)
+                {
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">Document ID: @doc.GetValue("_id", "N/A")</h6>
+                        </div>
+                        <div class="card-body">
+                            <h6>Field Names:</h6>
+                            <ul>
+                                @foreach (var element in doc.Elements)
+                                {
+                                    <li><strong>@element.Name</strong>: @element.Value</li>
+                                }
+                            </ul>
+
+                            <h6>Raw JSON:</h6>
+                            <pre
+                                class="bg-light p-2 rounded"><code>@doc.ToJson(new JsonWriterSettings { Indent = true })</code></pre>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<BsonDocument>? rawDocuments;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRawData();
+    }
+
+    private async Task LoadRawData()
+    {
+        try
+        {
+            rawDocuments = await LogService.GetRawLogsAsync(10);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load raw MongoDB data");
+        }
+    }
+
+    private async Task RefreshData()
+    {
+        await LoadRawData();
+    }
+}
