@@ -3,6 +3,7 @@ using ECommerce.Infrastructure.Persistence;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
 
 namespace ECommerce.Blazor.Services;
 
@@ -29,11 +30,9 @@ public class LogService : ILogService
 {
     private readonly IMongoCollection<RequestResponseLog> _collection;
 
-    public LogService(IOptions<MongoSettings> options)
+    public LogService(IMongoDbContext mongoDbContext)
     {
-        var client = new MongoClient(options.Value.ConnectionString);
-        var database = client.GetDatabase(options.Value.DatabaseName);
-        _collection = database.GetCollection<RequestResponseLog>("http_logs");
+        _collection = mongoDbContext.GetCollection<RequestResponseLog>("http_logs");
     }
 
     public async Task<List<RequestResponseLog>> GetLogsAsync(LogFilter filter, CancellationToken cancellationToken = default)

@@ -23,21 +23,32 @@ public sealed class MongoDbContext : IMongoDbContext
 {
     private readonly IMongoDatabase _database;
 
+    static MongoDbContext()
+    {
+        // Configure entity mappings statically to ensure they're registered before any usage
+        ConfigureEntityMappings();
+    }
+
     public MongoDbContext(IOptions<MongoSettings> options)
     {
         // Configure MongoDB conventions
         var conventionPack = new ConventionPack
         {
-            new CamelCaseElementNameConvention(),
             new IgnoreIfDefaultConvention(true)
         };
         ConventionRegistry.Register("CustomConventions", conventionPack, t => true);
 
-        // Configure entity mappings
+        // Ensure entity mappings are configured
         ConfigureEntityMappings();
 
         var client = new MongoClient(options.Value.ConnectionString);
         _database = client.GetDatabase(options.Value.DatabaseName);
+    }
+
+    // Static method to ensure class mapping is configured
+    public static void EnsureClassMappingsConfigured()
+    {
+        ConfigureEntityMappings();
     }
 
     private static void ConfigureEntityMappings()
@@ -53,7 +64,7 @@ public sealed class MongoDbContext : IMongoDbContext
             });
         }
 
-        // Configure RequestResponseLog entity
+        // Configure RequestResponseLog entity with explicit field mapping
         if (!BsonClassMap.IsClassMapRegistered(typeof(RequestResponseLog)))
         {
             BsonClassMap.RegisterClassMap<RequestResponseLog>(cm =>
@@ -62,7 +73,7 @@ public sealed class MongoDbContext : IMongoDbContext
                 cm.MapIdProperty(p => p.Id);
                 cm.IdMemberMap.SetIdGenerator(StringObjectIdGenerator.Instance);
                 
-                // Explicitly map all properties to ensure consistency
+                // Explicitly map all properties to ensure consistency with existing data
                 cm.MapProperty(p => p.TimestampUtc).SetElementName("timestampUtc");
                 cm.MapProperty(p => p.TraceId).SetElementName("traceId");
                 cm.MapProperty(p => p.Method).SetElementName("method");
@@ -73,6 +84,12 @@ public sealed class MongoDbContext : IMongoDbContext
                 cm.MapProperty(p => p.RequestHeaders).SetElementName("requestHeaders");
                 cm.MapProperty(p => p.ResponseHeaders).SetElementName("responseHeaders");
             });
+            
+            Console.WriteLine("RequestResponseLog class mapping configured successfully");
+        }
+        else
+        {
+            Console.WriteLine("RequestResponseLog class mapping already registered");
         }
     }
 
